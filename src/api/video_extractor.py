@@ -1,20 +1,36 @@
+import logging
+
 from src.api.youtube_client import get_youtube_client
+from src.api.retry import execute_with_retry
+
+logger = logging.getLogger(__name__)
 
 
-def get_video_statistics(video_ids: list[str]) -> list[dict]:
+def get_video_statistics(
+    video_ids: list[str]
+) -> list[dict]:
 
     youtube = get_youtube_client()
 
     results = []
 
-    for i in range(0, len(video_ids), 50):
+    unique_ids = list(dict.fromkeys(video_ids))
 
-        batch = video_ids[i:i + 50]
+    for i in range(0, len(unique_ids), 50):
 
-        response = youtube.videos().list(
+        batch = unique_ids[i:i + 50]
+
+        logger.info(
+            "Extracting statistics for %s videos",
+            len(batch)
+        )
+
+        request = youtube.videos().list(
             part="snippet,statistics,contentDetails",
             id=",".join(batch)
-        ).execute()
+        )
+
+        response = execute_with_retry(request)
 
         for item in response.get("items", []):
 
@@ -33,5 +49,10 @@ def get_video_statistics(video_ids: list[str]) -> list[dict]:
                 "likes": int(stats.get("likeCount", 0)),
                 "comments": int(stats.get("commentCount", 0))
             })
+
+    logger.info(
+        "Video enrichment completed: %s videos",
+        len(results)
+    )
 
     return results
