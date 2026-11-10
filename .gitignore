@@ -27,3 +27,8 @@ data/processed/
 # OS
 .DS_Store
 Thumbs.db
+
+# Snowflake RSA credentials
+*.p8
+*.pub
+*.pem
