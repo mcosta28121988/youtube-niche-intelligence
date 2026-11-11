@@ -1,0 +1,90 @@
+from unittest.mock import MagicMock
+
+from src.api.channel_extractor import get_channel_statistics
+from src.api.quota import QuotaTracker
+from src.api.video_extractor import get_video_statistics
+from src.ingestion.discover_videos import search_videos
+
+
+def search_item(video_id: str) -> dict:
+    return {
+        "id": {"videoId": video_id},
+        "snippet": {
+            "channelId": "ch1",
+            "title": f"Title {video_id}",
+            "description": "desc",
+            "channelTitle": "Channel",
+            "publishedAt": "2026-01-01T00:00:00Z",
+        },
+    }
+
+
+def test_search_ranks_across_pages_and_dedupes():
+    youtube = MagicMock()
+    youtube.search.return_value.list.return_value.execute.side_effect = [
+        {"items": [search_item("a"), search_item("b")], "nextPageToken": "p2"},
+        {"items": [search_item("b"), search_item("c")]},
+    ]
+    quota = QuotaTracker()
+
+    videos = search_videos("kw", max_pages=3, youtube=youtube, quota=quota)
+
+    assert [(v["video_id"], v["search_rank"]) for v in videos] == [
+        ("a", 1), ("b", 2), ("c", 4),
+    ]
+    assert videos[0]["raw_payload"] == search_item("a")
+    assert videos[0]["keyword"] == "kw"
+    assert quota.search_calls == 2  # stopped when no nextPageToken
+
+
+def test_video_hidden_counts_are_none_not_zero():
+    youtube = MagicMock()
+    item = {
+        "id": "v1",
+        "snippet": {"channelId": "ch1", "title": "T", "publishedAt": "2026-01-01T00:00:00Z"},
+        "statistics": {"viewCount": "10"},  # likes hidden, comments disabled
+        "contentDetails": {"duration": "PT1M"},
+    }
+    youtube.videos.return_value.list.return_value.execute.return_value = {"items": [item]}
+    quota = QuotaTracker()
+
+    [video] = get_video_statistics(["v1", "v1"], youtube=youtube, quota=quota)
+
+    assert video["views"] == 10
+    assert video["likes"] is None
+    assert video["comments"] is None
+    assert video["raw_payload"] == item
+    assert quota.units == 1
+
+
+def test_video_batches_of_fifty():
+    youtube = MagicMock()
+    youtube.videos.return_value.list.return_value.execute.return_value = {"items": []}
+    quota = QuotaTracker()
+
+    get_video_statistics([f"v{i}" for i in range(120)], youtube=youtube, quota=quota)
+
+    assert quota.calls["videos.list"] == 3
+
+
+def test_channel_hidden_subscriber_count_is_none():
+    youtube = MagicMock()
+    youtube.channels.return_value.list.return_value.execute.return_value = {
+        "items": [{
+            "id": "ch1",
+            "snippet": {"title": "C", "publishedAt": "2020-01-01T00:00:00Z"},
+            "statistics": {
+                "viewCount": "500",
+                "videoCount": "5",
+                "subscriberCount": "0",
+                "hiddenSubscriberCount": True,
+            },
+            "contentDetails": {"relatedPlaylists": {"uploads": "UU1"}},
+        }]
+    }
+
+    [channel] = get_channel_statistics(["ch1"], youtube=youtube)
+
+    assert channel["subscribers"] is None
+    assert channel["total_views"] == 500
+    assert channel["uploads_playlist_id"] == "UU1"

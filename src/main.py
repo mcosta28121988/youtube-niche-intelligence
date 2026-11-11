@@ -1,80 +1,62 @@
-import logging
-import html
+"""Command-line entry point for the YouTube ingestion pipeline.
 
+Usage:
+    python -m src.main                  # extract and load into Snowflake
+    python -m src.main --no-load        # extract only (still uses API quota)
+    python -m src.main --max-pages 2    # override pages per keyword
+    python -m src.main --purge-only     # enforce retention, no API calls
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+from collections.abc import Sequence
+
+from config.settings import load_settings
+from src.ingestion.pipeline import run_pipeline, run_retention
 from src.utils.logging_config import setup_logging
 
-from src.ingestion.discover_videos import search_videos
-from src.api.video_extractor import get_video_statistics
-from src.api.channel_extractor import get_channel_statistics
+logger = logging.getLogger("pipeline")
 
 
-def main():
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="YouTube ingestion pipeline")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--no-load", action="store_true",
+        help="Extract from the API without writing to Snowflake",
+    )
+    mode.add_argument(
+        "--purge-only", action="store_true",
+        help="Only delete RAW rows older than the retention window",
+    )
+    parser.add_argument(
+        "--max-pages", type=int,
+        help="Pages per keyword (overrides YOUTUBE_MAX_PAGES_PER_KEYWORD)",
+    )
+    return parser.parse_args(argv)
 
+
+def main(argv: Sequence[str] | None = None) -> int:
     setup_logging()
-
-    logger = logging.getLogger("pipeline")
-
-    keywords = [
-        "history documentary",
-        "space documentary",
-        "ancient civilizations"
-    ]
+    args = parse_args(argv)
 
     try:
+        settings = load_settings(max_pages_per_keyword=args.max_pages)
 
-        all_videos = []
-
-        # STEP 1: Discovery
-        for keyword in keywords:
-
-            videos = search_videos(
-                keyword=keyword,
-                max_pages=1
-            )
-
-            all_videos.extend(videos)
-
-        # STEP 2: Remove duplicate video IDs
-        unique_videos = {
-            video["video_id"]: video
-            for video in all_videos
-        }
-
-        video_ids = list(unique_videos.keys())
-
-        # STEP 3: Video enrichment
-        video_data = get_video_statistics(video_ids)
-
-        # STEP 4: Channel extraction
-        channel_ids = list({
-            video["channel_id"]
-            for video in video_data
-        })
-
-        channel_data = get_channel_statistics(channel_ids)
-
-        # STEP 5: Summary
-        logger.info("Pipeline completed successfully")
-
-        logger.info("Videos discovered: %s", len(video_ids))
-
-        logger.info("Videos enriched: %s", len(video_data))
-
-        logger.info("Channels extracted: %s", len(channel_data))
-
-        for video in video_data[:5]:
-
-            print("-" * 50)
-            print("Title:", html.unescape(video["title"]))
-            print("Views:", video["views"])
-            print("Likes:", video["likes"])
-            print("Comments:", video["comments"])
+        if args.purge_only:
+            run_retention(settings)
+        else:
+            run_pipeline(settings, load=not args.no_load)
 
     except Exception:
-
         logger.exception("Pipeline execution failed")
-        raise
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

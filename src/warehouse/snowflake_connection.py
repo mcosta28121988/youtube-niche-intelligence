@@ -19,14 +19,11 @@ from pathlib import Path
 
 import snowflake.connector
 from cryptography.hazmat.primitives import serialization
-from dotenv import load_dotenv
 from snowflake.connector import SnowflakeConnection
 
+from config.settings import PROJECT_ROOT  # also loads .env
+
 logger = logging.getLogger(__name__)
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-load_dotenv(PROJECT_ROOT / ".env")
 
 REQUIRED_ENV_VARS: tuple[str, ...] = (
     "SNOWFLAKE_ACCOUNT",
