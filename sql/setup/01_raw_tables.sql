@@ -40,12 +40,12 @@ CREATE TABLE IF NOT EXISTS YOUTUBE_DB.CONTROL.PIPELINE_RUNS (
 COMMENT = 'Pipeline execution log. Grain: one row per run.';
 
 -- ---------------------------------------------------------------------------
--- RAW.VIDEO_DISCOVERY - search.list results
+-- RAW.VIDEO_DISCOVERY - search.list results and trending charts
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS YOUTUBE_DB.RAW.VIDEO_DISCOVERY (
     RUN_ID          VARCHAR(36)    NOT NULL COMMENT 'FK to CONTROL.PIPELINE_RUNS',
-    SEARCH_KEYWORD  VARCHAR(500)   NOT NULL COMMENT 'Query sent to search.list',
-    SEARCH_RANK     NUMBER(5,0)             COMMENT '1-based position in results for the keyword',
+    SEARCH_KEYWORD  VARCHAR(500)            COMMENT 'Keyword sent to search.list as q; NULL for category-only searches and trending charts',
+    SEARCH_RANK     NUMBER(5,0)             COMMENT '1-based position in the search results or trending chart',
     VIDEO_ID        VARCHAR(50)    NOT NULL COMMENT 'YouTube video ID',
     CHANNEL_ID      VARCHAR(50)             COMMENT 'YouTube channel ID',
     TITLE           VARCHAR                 COMMENT 'Video title (HTML-escaped as returned by API)',
@@ -57,9 +57,11 @@ CREATE TABLE IF NOT EXISTS YOUTUBE_DB.RAW.VIDEO_DISCOVERY (
     -- Added by migration 20261111_03 (kept last so fresh and migrated tables match)
     SEARCH_NAME     VARCHAR(200)   NOT NULL COMMENT 'Unique name of the configured search (config/searches.toml)',
     SEARCH_FILTERS  VARIANT                 COMMENT 'Exact search.list parameters sent (q, order, regionCode, ...)',
+    -- Added by migration 20261111_04
+    SEARCH_SOURCE   VARCHAR(20)    NOT NULL COMMENT 'Discovery source: search (search.list) or trending (videos.list chart=mostPopular)',
     CONSTRAINT PK_VIDEO_DISCOVERY PRIMARY KEY (RUN_ID, SEARCH_NAME, VIDEO_ID)
 )
-COMMENT = 'Search results. Grain: one row per run x configured search x video.';
+COMMENT = 'Discovered videos from searches and trending charts. Grain: one row per run x configured search x video.';
 
 -- ---------------------------------------------------------------------------
 -- RAW.VIDEO_SNAPSHOT - videos.list statistics at a point in time
