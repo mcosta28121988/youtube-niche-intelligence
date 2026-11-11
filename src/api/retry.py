@@ -62,7 +62,7 @@ def is_retryable(error: HttpError) -> bool:
 
 def backoff_seconds(attempt: int) -> float:
     """Exponential backoff (1, 2, 4 ... capped) plus up to 1s of jitter."""
-    return min(2 ** (attempt - 1), MAX_BACKOFF_SECONDS) + random.uniform(0, 1)
+    return min(2 ** (attempt - 1), MAX_BACKOFF_SECONDS) + random.uniform(0, 1)  # noqa: S311 - jitter, not crypto
 
 
 def execute_with_retry(

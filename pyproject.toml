@@ -1,0 +1,42 @@
+[project]
+name = "youtube-niche-intelligence"
+version = "0.1.0"
+description = "YouTube Data API -> Snowflake -> dbt -> Power BI niche analytics pipeline"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { file = "LICENSE" }
+# Dependencies are pinned in requirements.txt / requirements-dev.txt.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+filterwarnings = ["error::DeprecationWarning:src.*", "error::DeprecationWarning:config.*"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = ["dbt_project"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "S",    # flake8-bandit (security)
+    "LOG",  # flake8-logging
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "S608",  # SQL built from column specs/identifiers only; values always bound
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]  # asserts and fake credentials in tests
+
+[tool.ruff.lint.isort]
+known-first-party = ["config", "src"]

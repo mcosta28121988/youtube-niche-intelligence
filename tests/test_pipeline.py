@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -82,6 +82,7 @@ def test_successful_run_loads_and_records_metrics(mocks):
     mocks["tracker"].start.assert_called_once()
     status, metrics = mocks["tracker"].finish.call_args.args[:2]
     assert status is RunStatus.SUCCEEDED
+    assert metrics.videos_discovered == 3
     mocks["connect"].return_value.close.assert_called_once()
 
 

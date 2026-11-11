@@ -2,10 +2,10 @@
 import base64
 import hashlib
 import os
-
 from pathlib import Path
-from dotenv import load_dotenv
+
 from cryptography.hazmat.primitives import serialization
+from dotenv import load_dotenv
 
 load_dotenv()
 

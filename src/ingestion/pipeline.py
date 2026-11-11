@@ -15,7 +15,7 @@ import logging
 import uuid
 from contextlib import closing
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from googleapiclient.discovery import Resource
@@ -56,7 +56,7 @@ class PipelineResult:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _stamp(rows: list[dict[str, Any]], extracted_at: str) -> list[dict[str, Any]]:
@@ -74,7 +74,7 @@ def extract(
 
     # Resolve all category names up front so a typo fails before any search.
     resolver = CategoryResolver(youtube, quota)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     search_params = [
         (
             search,

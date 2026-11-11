@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from snowflake.connector import SnowflakeConnection
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 MAX_ERROR_LENGTH = 4000
 
 
-class RunStatus(str, Enum):
+class RunStatus(StrEnum):
     RUNNING = "RUNNING"
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"

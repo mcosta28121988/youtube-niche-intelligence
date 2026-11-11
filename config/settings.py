@@ -16,7 +16,7 @@ import os
 import re
 import tomllib
 from dataclasses import asdict, dataclass, fields, replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -198,7 +198,7 @@ class SearchSpec:
                 params[api_name] = value
 
         if self.published_within_days is not None:
-            now = now or datetime.now(timezone.utc)
+            now = now or datetime.now(UTC)
             published_after = now - timedelta(days=self.published_within_days)
             params["publishedAfter"] = published_after.strftime("%Y-%m-%dT%H:%M:%SZ")
 

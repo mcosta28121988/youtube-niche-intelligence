@@ -1,0 +1,5 @@
+# Development, testing and CI tooling
+-r requirements.txt
+
+pytest==9.2.0
+ruff==0.17.4

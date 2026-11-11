@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -12,7 +12,7 @@ from config.settings import (
     read_search_config,
 )
 
-NOW = datetime(2026, 11, 11, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 11, 11, 12, 0, tzinfo=UTC)
 
 
 def write_config(tmp_path, text: str):
@@ -105,7 +105,7 @@ def test_retention_outside_policy_window_is_rejected(days):
 def test_search_call_budget_is_enforced():
     searches = tuple(SearchSpec(f"kw{i}", max_pages=2) for i in range(51))
 
-    assert 51 * 2 > SEARCH_CALLS_DAILY_LIMIT
+    assert SEARCH_CALLS_DAILY_LIMIT < 51 * 2
     with pytest.raises(ValueError, match="daily limit"):
         PipelineSettings(searches=searches)
 
@@ -283,5 +283,5 @@ def test_trending_entries_ignore_search_only_defaults(tmp_path):
 def test_trending_entry_with_explicit_search_filter_is_rejected(tmp_path):
     path = write_config(tmp_path, '[[searches]]\nsource = "trending"\nduration = "long"')
 
-    with pytest.raises(ValueError, match="#1.*duration"):
+    with pytest.raises(ValueError, match=r"#1.*duration"):
         read_search_config(path)
