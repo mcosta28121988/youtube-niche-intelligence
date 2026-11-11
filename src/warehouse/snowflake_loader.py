@@ -71,6 +71,7 @@ VIDEO_DISCOVERY = TableSpec(
         C("DISCOVERED_AT", "extracted_at", T.TIMESTAMP),
         C("SEARCH_NAME", "search_name"),
         C("SEARCH_FILTERS", "search_filters", T.JSON),
+        C("SEARCH_SOURCE", "search_source"),
     ),
     retention_column="DISCOVERED_AT",
 )

@@ -57,12 +57,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def print_plan(settings: PipelineSettings) -> None:
     print(f"\n{len(settings.searches)} searches, "
-          f"up to {settings.planned_search_calls} search calls per run "
+          f"up to {settings.planned_search_calls} search calls "
+          f"+ {settings.planned_trending_units} quota units for trending per run "
           f"(retention: {settings.retention_days} days)\n")
     for search in settings.searches:
         placeholder = None if search.category_is_id else f"<{search.category}>"
         params = search.api_parameters(category_id=placeholder)
-        print(f"- {search.name}  (keyword: {search.keyword!r}, pages: {search.max_pages})")
+        if search.source == "trending":
+            what = "trending chart"
+        else:
+            what = f"keyword: {search.keyword!r}" if search.keyword else "category only"
+        print(f"- {search.name}  ({search.source}, {what}, pages: {search.max_pages})")
         for key, value in params.items():
             print(f"      {key} = {value}")
     print("\nCategory names in <> are resolved against the live list at run time.")

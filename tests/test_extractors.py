@@ -1,9 +1,14 @@
+import json
 from unittest.mock import MagicMock
+
+import httplib2
+import pytest
+from googleapiclient.errors import HttpError
 
 from src.api.channel_extractor import get_channel_statistics
 from src.api.quota import QuotaTracker
 from src.api.video_extractor import get_video_statistics
-from src.ingestion.discover_videos import search_videos
+from src.ingestion.discover_videos import search_videos, trending_videos
 
 
 def search_item(video_id: str) -> dict:
@@ -107,3 +112,67 @@ def test_channel_hidden_subscriber_count_is_none():
     assert channel["subscribers"] is None
     assert channel["total_views"] == 500
     assert channel["uploads_playlist_id"] == "UU1"
+
+
+def test_search_without_keyword_omits_q():
+    youtube = MagicMock()
+    youtube.search.return_value.list.return_value.execute.return_value = {
+        "items": [search_item("a")]
+    }
+
+    [video] = search_videos(youtube=youtube, filters={"videoCategoryId": "27"})
+
+    kwargs = youtube.search.return_value.list.call_args.kwargs
+    assert "q" not in kwargs
+    assert kwargs["videoCategoryId"] == "27"
+    assert video["keyword"] is None
+
+
+def chart_item(video_id: str) -> dict:
+    return {"id": video_id, **{k: v for k, v in search_item(video_id).items() if k != "id"}}
+
+
+def test_trending_reads_chart_and_ranks_by_position():
+    youtube = MagicMock()
+    youtube.videos.return_value.list.return_value.execute.side_effect = [
+        {"items": [chart_item("a"), chart_item("b")], "nextPageToken": "p2"},
+        {"items": [chart_item("c")]},
+    ]
+    quota = QuotaTracker()
+
+    videos = trending_videos(
+        max_pages=4, youtube=youtube, quota=quota,
+        filters={"regionCode": "AU", "videoCategoryId": "24"},
+    )
+
+    assert [(v["video_id"], v["search_rank"]) for v in videos] == [("a", 1), ("b", 2), ("c", 3)]
+    assert videos[0]["keyword"] is None
+    assert videos[0]["channel_id"] == "ch1"
+    kwargs = youtube.videos.return_value.list.call_args.kwargs
+    assert kwargs["chart"] == "mostPopular"
+    assert kwargs["regionCode"] == "AU"
+    assert quota.calls["videos.list"] == 2
+    assert quota.search_calls == 0
+
+
+def test_trending_missing_chart_is_skipped_not_fatal():
+    youtube = MagicMock()
+    content = json.dumps(
+        {"error": {"code": 404, "errors": [{"reason": "notFound"}]}}
+    ).encode()
+    youtube.videos.return_value.list.return_value.execute.side_effect = HttpError(
+        httplib2.Response({"status": 404}), content
+    )
+
+    assert trending_videos(youtube=youtube, filters={"videoCategoryId": "27"}) == []
+
+
+def test_trending_other_errors_still_raise():
+    youtube = MagicMock()
+    content = json.dumps({"error": {"code": 403, "errors": [{"reason": "forbidden"}]}}).encode()
+    youtube.videos.return_value.list.return_value.execute.side_effect = HttpError(
+        httplib2.Response({"status": 403}), content
+    )
+
+    with pytest.raises(HttpError):
+        trending_videos(youtube=youtube)

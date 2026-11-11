@@ -157,7 +157,7 @@ def test_defaults_merge_into_searches_with_overrides(tmp_path):
     [
         ('[defaults]\nregoin_code = "AU"\n[[searches]]\nkeyword = "a"', "regoin_code"),
         ('[defaults]\nkeyword = "a"\n[[searches]]\nkeyword = "b"', "keyword"),
-        ('[[searches]]\nname = "no keyword"', "missing 'keyword'"),
+        ('[[searches]]\nname = "no keyword"', "keyword, a category, or both"),
         ('[defaults]\nregion_code = "AU"', "No \\[\\[searches\\]\\]"),
         ('[filters]\nx = 1\n[[searches]]\nkeyword = "a"', "filters"),
         ('[[searches]\nkeyword = "a"', "Invalid TOML"),
@@ -198,3 +198,90 @@ def test_load_settings_rejects_non_integer_env(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="YOUTUBE_RETENTION_DAYS"):
         load_settings()
+
+
+# --- Category-only searches and trending charts --------------------------------
+
+def test_category_only_search_is_valid_and_sends_no_keyword():
+    spec = SearchSpec(category="27", region_code="AU")
+
+    assert spec.keyword is None
+    assert spec.name == "search: 27 (AU)"
+    assert spec.api_parameters()["videoCategoryId"] == "27"
+
+
+def test_search_needs_keyword_or_category():
+    with pytest.raises(ValueError, match="keyword, a category, or both"):
+        SearchSpec(region_code="AU")
+
+
+def test_trending_chart_parameters_and_default_name():
+    spec = SearchSpec(source="trending", category="Education", region_code="AU")
+
+    assert spec.name == "trending: Education (AU)"
+    assert spec.api_parameters(category_id="27") == {
+        "regionCode": "AU",
+        "videoCategoryId": "27",
+    }
+
+
+def test_trending_without_category_reads_the_overall_chart():
+    assert SearchSpec(source="trending").api_parameters() == {}
+
+
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        ({"keyword": "kw"}, "keyword"),
+        ({"duration": "long"}, "duration"),
+        ({"published_within_days": 7}, "published_within_days"),
+        ({"max_pages": 5}, "max_pages"),
+        ({"source": "chart"}, "source"),
+    ],
+)
+def test_invalid_trending_values_are_rejected(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        SearchSpec(**{"source": "trending", **kwargs})
+
+
+def test_trending_pages_do_not_count_against_search_budget():
+    settings = PipelineSettings(searches=(
+        SearchSpec("kw", max_pages=2),
+        SearchSpec(source="trending", max_pages=4),
+    ))
+
+    assert settings.planned_search_calls == 2
+    assert settings.planned_trending_units == 4
+    capped = settings.with_max_pages(10)
+    assert [s.max_pages for s in capped.searches] == [10, 4]
+
+
+def test_trending_entries_ignore_search_only_defaults(tmp_path):
+    path = write_config(tmp_path, """
+        [defaults]
+        region_code = "AU"
+        duration = "long"
+        published_within_days = 7
+
+        [[searches]]
+        category = "Education"
+
+        [[searches]]
+        source = "trending"
+        category = 24
+    """)
+
+    category_search, trending = read_search_config(path)
+
+    assert category_search.keyword is None
+    assert category_search.duration == "long"
+    assert trending.source == "trending"
+    assert (trending.region_code, trending.duration) == ("AU", "any")
+    assert trending.published_within_days is None
+
+
+def test_trending_entry_with_explicit_search_filter_is_rejected(tmp_path):
+    path = write_config(tmp_path, '[[searches]]\nsource = "trending"\nduration = "long"')
+
+    with pytest.raises(ValueError, match="#1.*duration"):
+        read_search_config(path)

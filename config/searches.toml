@@ -1,8 +1,20 @@
 # =============================================================================
 # YouTube search configuration
 #
+# Two discovery sources:
+#   source = "search"   (default) search.list with a keyword, a category, or
+#                       both, plus the filters below. Each page uses 1 of the
+#                       100 daily search.list calls.
+#   source = "trending" YouTube's Most Popular chart for region_code (and
+#                       optionally a category). Each page costs 1 quota unit;
+#                       the chart holds at most 200 videos (max_pages <= 4).
+#                       Only region_code and category apply; search filters
+#                       in [defaults] are ignored for trending entries.
+#
+# Neither returns *every* video in a category: results are YouTube's ranked
+# selection (up to ~500 per search, 200 per chart).
+#
 # [defaults] apply to every [[searches]] entry; any entry can override them.
-# Each page of each search uses 1 of the 100 daily search.list calls.
 # Validate without calling search:  python -m src.main --check-config
 # List categories for a region:      python -m src.main --list-categories --region AU
 # =============================================================================
@@ -29,8 +41,8 @@ safe_search = "moderate"
 
 # Other optional filters (all default to "any"):
 # category   = "Education"      # name or ID - see --list-categories
-# definition = "high"           # any | high (HD) | standard
-# caption    = "closedCaption"  # any | closedCaption | none
+# definition = "any"           # any | high (HD) | standard
+# caption    = "any"  # any | closedCaption | none
 # license    = "creativeCommon" # any | creativeCommon | youtube
 # video_type = "movie"          # any | episode | movie
 # dimension  = "3d"             # any | 2d | 3d
@@ -48,6 +60,21 @@ keyword = "space documentary"
 
 [[searches]]
 keyword = "ancient civilizations"
+
+# Category only (no keyword): top long-form Education videos from the last
+# 7 days in AU, using the defaults above.
+[[searches]]
+name = "AU education - category only"
+category = "Education"
+
+# Trending chart. Education has no AU chart; Science & Technology does.
+# AU categories with a chart (Nov 2026): 1, 2, 10, 15, 17, 20, 22, 23, 24,
+# 25, 26, 28. A category without a chart is skipped with a warning.
+[[searches]]
+name = "AU trending - science & technology"
+source = "trending"
+category = "Science & Technology"
+max_pages = 1
 
 # Example: same keyword, different filters - give each a unique name.
 # [[searches]]

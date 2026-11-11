@@ -25,6 +25,7 @@ def mocks():
         patch.object(pipeline, "purge_expired", return_value={}) as purge,
         patch.object(pipeline, "load_run", return_value={}) as load,
         patch.object(pipeline, "search_videos") as search,
+        patch.object(pipeline, "trending_videos") as trending,
         patch.object(pipeline, "get_video_statistics") as videos,
         patch.object(pipeline, "get_channel_statistics") as channels,
         patch.object(pipeline, "CategoryResolver") as resolver_cls,
@@ -36,6 +37,9 @@ def mocks():
             discovery("v1", "c1", keyword),
             discovery("v2" if keyword == "kw1" else "v3", "c2", keyword),
         ]
+        trending.side_effect = lambda **kw: [
+            {"video_id": "v9", "channel_id": "c9", "keyword": None},
+        ]
         videos.side_effect = lambda ids, **kw: [
             {"video_id": i, "channel_id": "c1" if i == "v1" else "c2"} for i in ids
         ]
@@ -45,6 +49,8 @@ def mocks():
             "tracker": tracker_cls.return_value,
             "purge": purge,
             "load": load,
+            "search": search,
+            "trending": trending,
             "videos": videos,
             "channels": channels,
         }
@@ -100,3 +106,29 @@ def test_no_load_mode_never_touches_snowflake(mocks):
     mocks["connect"].assert_not_called()
     mocks["load"].assert_not_called()
     assert result.metrics.videos_enriched == 3
+
+
+def test_category_only_search_and_trending_chart(mocks):
+    settings = PipelineSettings(searches=(
+        SearchSpec("kw1"),
+        SearchSpec(category="Education", region_code="AU"),
+        SearchSpec(source="trending", category="24", region_code="AU"),
+    ))
+
+    pipeline.run_pipeline(settings)
+
+    category_call = mocks["search"].call_args_list[1].kwargs
+    assert category_call["keyword"] is None
+    assert category_call["filters"]["videoCategoryId"] == "27"
+    assert mocks["trending"].call_args.kwargs["filters"] == {
+        "regionCode": "AU", "videoCategoryId": "24",
+    }
+
+    rows = mocks["load"].call_args.args[2][0][1]
+    by_name = {r["search_name"]: r for r in rows}
+    assert by_name["kw1"]["search_source"] == "search"
+    assert "q" not in by_name["search: Education (AU)"]["search_filters"]
+    trending_row = by_name["trending: 24 (AU)"]
+    assert trending_row["search_source"] == "trending"
+    assert trending_row["search_filters"]["chart"] == "mostPopular"
+    assert "v9" in mocks["videos"].call_args.args[0]

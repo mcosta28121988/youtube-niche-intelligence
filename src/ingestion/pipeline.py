@@ -3,7 +3,7 @@
 Run order:
   1. register the run in CONTROL.PIPELINE_RUNS (RUNNING)
   2. purge RAW rows past the retention window (runs even if extraction fails)
-  3. discover videos per configured search (search.list with filters)
+  3. discover videos per configured search (search.list) or trending chart
   4. enrich videos (videos.list) and channels (channels.list)
   5. load all RAW tables atomically for this RUN_ID
   6. mark the run SUCCEEDED / FAILED with metrics
@@ -26,7 +26,7 @@ from src.api.channel_extractor import get_channel_statistics
 from src.api.quota import QuotaTracker
 from src.api.video_extractor import get_video_statistics
 from src.api.youtube_client import get_youtube_client
-from src.ingestion.discover_videos import search_videos
+from src.ingestion.discover_videos import search_videos, trending_videos
 from src.warehouse.pipeline_runs import PipelineRunTracker, RunMetrics, RunStatus
 from src.warehouse.snowflake_connection import get_snowflake_connection
 from src.warehouse.snowflake_loader import (
@@ -88,16 +88,30 @@ def extract(
 
     for search, params in search_params:
         extracted_at = _utc_now()
-        results = search_videos(
-            keyword=search.keyword,
-            max_pages=search.max_pages,
-            youtube=youtube,
-            quota=quota,
-            filters=params,
-        )
-        recorded_filters = {"q": search.keyword, **params}
+        if search.source == "trending":
+            results = trending_videos(
+                max_pages=search.max_pages,
+                youtube=youtube,
+                quota=quota,
+                filters=params,
+            )
+            recorded_filters = {"chart": "mostPopular", **params}
+        else:
+            results = search_videos(
+                keyword=search.keyword,
+                max_pages=search.max_pages,
+                youtube=youtube,
+                quota=quota,
+                filters=params,
+            )
+            recorded_filters = {"q": search.keyword, **params} if search.keyword else params
         data.discovery.extend(
-            {**row, "search_name": search.name, "search_filters": recorded_filters}
+            {
+                **row,
+                "search_name": search.name,
+                "search_source": search.source,
+                "search_filters": recorded_filters,
+            }
             for row in _stamp(results, extracted_at)
         )
 
@@ -130,8 +144,9 @@ def run_pipeline(settings: PipelineSettings, load: bool = True) -> PipelineResul
     result = PipelineResult(run_id=run_id, metrics=metrics)
 
     logger.info(
-        "Run %s: %s searches, up to %s search calls, load=%s",
-        run_id, len(settings.searches), settings.planned_search_calls, load,
+        "Run %s: %s searches, up to %s search calls + %s trending units, load=%s",
+        run_id, len(settings.searches), settings.planned_search_calls,
+        settings.planned_trending_units, load,
     )
 
     youtube = get_youtube_client()

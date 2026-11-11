@@ -1,6 +1,6 @@
 """Central configuration for the YouTube ingestion pipeline.
 
-Search definitions (keywords + YouTube search filters) live in
+Search definitions (keyword/category searches and trending charts) live in
 ``config/searches.toml``. Operational settings come from environment
 variables (``.env``). Importing this module loads ``.env`` from the project
 root.
@@ -66,16 +66,33 @@ API_PARAMETERS: dict[str, str] = {
     "relevance_language": "relevanceLanguage",
 }
 
+# Discovery sources:
+#   search   - search.list; keyword and/or category plus filters. Each page
+#              uses 1 of the 100 daily search calls.
+#   trending - videos.list chart=mostPopular for a region (and optionally a
+#              category). Each page costs 1 quota unit; the chart holds at
+#              most 200 videos.
+SOURCES = frozenset({"search", "trending"})
+TRENDING_MAX_PAGES = 4
+
+# Fields the trending chart understands; everything else is search-only.
+TRENDING_FIELDS = frozenset({"source", "name", "max_pages", "region_code", "category"})
+
 REGION_PATTERN = re.compile(r"^[A-Z]{2}$")
 LANGUAGE_PATTERN = re.compile(r"^[a-z]{2,3}(-[A-Za-z]{2,4})?$")
 
 
 @dataclass(frozen=True)
 class SearchSpec:
-    """One configured search: a keyword plus YouTube search filters."""
+    """One configured discovery: a filtered search or a trending chart.
 
-    keyword: str
-    name: str = ""  # unique label; defaults to the keyword
+    A ``search`` needs a keyword, a category, or both. A ``trending`` chart
+    takes only region_code and category.
+    """
+
+    keyword: str | None = None
+    name: str = ""  # unique label; defaults to the keyword or source+category
+    source: str = "search"
     max_pages: int = 1
     order: str = "viewCount"
     duration: str = "any"
@@ -92,13 +109,41 @@ class SearchSpec:
     safe_search: str = "moderate"
 
     def __post_init__(self) -> None:
-        keyword = (self.keyword or "").strip()
-        if not keyword:
-            raise ValueError("Search keyword must not be empty")
-        object.__setattr__(self, "keyword", keyword)
-        object.__setattr__(self, "name", (self.name or keyword).strip())
+        if self.source not in SOURCES:
+            raise ValueError(
+                f"source={self.source!r} is invalid; use one of {sorted(SOURCES)}"
+            )
+        if self.keyword is not None:
+            keyword = str(self.keyword).strip()
+            if not keyword:
+                raise ValueError("Search keyword must not be empty")
+            object.__setattr__(self, "keyword", keyword)
+        if self.category is not None:
+            category = str(self.category).strip()
+            if not category:
+                raise ValueError("Search category must not be empty")
+            object.__setattr__(self, "category", category)
+        object.__setattr__(self, "name", (self.name or self._default_name()).strip())
 
         label = f"Search '{self.name}'"
+        if self.source == "search" and self.keyword is None and self.category is None:
+            raise ValueError(f"{label}: a search needs a keyword, a category, or both")
+        if self.source == "trending":
+            unsupported = [
+                f.name for f in fields(self)
+                if f.name not in TRENDING_FIELDS and getattr(self, f.name) != f.default
+            ]
+            if unsupported:
+                raise ValueError(
+                    f"{label}: {', '.join(unsupported)} not supported by the "
+                    "trending chart (only region_code and category apply)"
+                )
+            if self.max_pages > TRENDING_MAX_PAGES:
+                raise ValueError(
+                    f"{label}: the trending chart holds at most "
+                    f"{TRENDING_MAX_PAGES * 50} videos; max_pages must be "
+                    f"<= {TRENDING_MAX_PAGES}"
+                )
         if self.max_pages < 1:
             raise ValueError(f"{label}: max_pages must be at least 1")
         for field_name, allowed in ALLOWED_VALUES.items():
@@ -121,11 +166,12 @@ class SearchSpec:
             raise ValueError(
                 f"{label}: relevance_language must be an ISO 639-1 code, e.g. 'en'"
             )
-        if self.category is not None:
-            category = str(self.category).strip()
-            if not category:
-                raise ValueError(f"{label}: category must not be empty")
-            object.__setattr__(self, "category", category)
+
+    def _default_name(self) -> str:
+        if self.source == "search" and self.keyword:
+            return self.keyword
+        name = f"{self.source}: {self.category or 'all categories'}"
+        return f"{name} ({self.region_code})" if self.region_code else name
 
     @property
     def category_is_id(self) -> bool:
@@ -136,13 +182,17 @@ class SearchSpec:
         category_id: str | None = None,
         now: datetime | None = None,
     ) -> dict[str, str]:
-        """search.list filter parameters (excluding q, part, type and paging).
+        """API filter parameters (excluding q, chart, part, type and paging).
 
+        For ``search`` these are search.list filters; for ``trending`` they
+        are the videos.list chart filters (regionCode, videoCategoryId).
         ``category_id`` must be supplied when ``category`` is a name; it is
         resolved against the live category list (see src/api/categories.py).
         """
         params: dict[str, str] = {}
         for field_name, api_name in API_PARAMETERS.items():
+            if self.source == "trending" and field_name not in TRENDING_FIELDS:
+                continue
             value = getattr(self, field_name)
             if value is not None and value != "any":
                 params[api_name] = value
@@ -201,13 +251,26 @@ class PipelineSettings:
     @property
     def planned_search_calls(self) -> int:
         """Upper bound on search.list calls for one run."""
-        return sum(search.max_pages for search in self.searches)
+        return sum(s.max_pages for s in self.searches if s.source == "search")
+
+    @property
+    def planned_trending_units(self) -> int:
+        """Upper bound on quota units used by trending charts for one run."""
+        return sum(s.max_pages for s in self.searches if s.source == "trending")
 
     def with_max_pages(self, max_pages: int) -> PipelineSettings:
-        """Copy with every search's max_pages overridden (e.g. from the CLI)."""
+        """Copy with every search's max_pages overridden (e.g. from the CLI).
+
+        Trending charts are capped at their maximum of TRENDING_MAX_PAGES.
+        """
+        def pages(search: SearchSpec) -> int:
+            if search.source == "trending":
+                return min(max_pages, TRENDING_MAX_PAGES)
+            return max_pages
+
         return replace(
             self,
-            searches=tuple(replace(s, max_pages=max_pages) for s in self.searches),
+            searches=tuple(replace(s, max_pages=pages(s)) for s in self.searches),
         )
 
     def to_run_parameters(self) -> dict[str, Any]:
@@ -232,7 +295,12 @@ def _check_keys(section: str, keys: set[str], allowed: frozenset[str]) -> None:
 
 
 def read_search_config(path: Path) -> tuple[SearchSpec, ...]:
-    """Parse searches.toml: ``[defaults]`` merged into each ``[[searches]]``."""
+    """Parse searches.toml: ``[defaults]`` merged into each ``[[searches]]``.
+
+    Trending entries only inherit the defaults the chart understands
+    (region_code, category, max_pages), so search filters such as duration
+    in ``[defaults]`` don't make them invalid.
+    """
     if not path.is_file():
         raise FileNotFoundError(f"Search config not found: {path}")
 
@@ -254,12 +322,16 @@ def read_search_config(path: Path) -> tuple[SearchSpec, ...]:
     searches = []
     for position, entry in enumerate(entries, start=1):
         _check_keys(f"[[searches]] #{position}", set(entry), _SEARCH_FIELDS)
-        if "keyword" not in entry:
-            raise ValueError(f"[[searches]] #{position} is missing 'keyword'")
-        merged = {**defaults, **entry}
+        inherited = defaults
+        if entry.get("source", defaults.get("source")) == "trending":
+            inherited = {k: v for k, v in defaults.items() if k in TRENDING_FIELDS}
+        merged = {**inherited, **entry}
         if merged.get("category") is not None:
             merged["category"] = str(merged["category"])
-        searches.append(SearchSpec(**merged))
+        try:
+            searches.append(SearchSpec(**merged))
+        except ValueError as error:
+            raise ValueError(f"[[searches]] #{position}: {error}") from error
     return tuple(searches)
 
 
