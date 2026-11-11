@@ -3,7 +3,7 @@
 Run order:
   1. register the run in CONTROL.PIPELINE_RUNS (RUNNING)
   2. purge RAW rows past the retention window (runs even if extraction fails)
-  3. discover videos per keyword (search.list)
+  3. discover videos per configured search (search.list with filters)
   4. enrich videos (videos.list) and channels (channels.list)
   5. load all RAW tables atomically for this RUN_ID
   6. mark the run SUCCEEDED / FAILED with metrics
@@ -21,6 +21,7 @@ from typing import Any
 from googleapiclient.discovery import Resource
 
 from config.settings import PipelineSettings
+from src.api.categories import CategoryResolver
 from src.api.channel_extractor import get_channel_statistics
 from src.api.quota import QuotaTracker
 from src.api.video_extractor import get_video_statistics
@@ -71,16 +72,34 @@ def extract(
     """Call the YouTube API; updates ``metrics`` as each stage completes."""
     data = ExtractedData()
 
-    for keyword in settings.keywords:
+    # Resolve all category names up front so a typo fails before any search.
+    resolver = CategoryResolver(youtube, quota)
+    now = datetime.now(timezone.utc)
+    search_params = [
+        (
+            search,
+            search.api_parameters(
+                category_id=resolver.resolve(search.category, search.region_code),
+                now=now,
+            ),
+        )
+        for search in settings.searches
+    ]
+
+    for search, params in search_params:
         extracted_at = _utc_now()
         results = search_videos(
-            keyword=keyword,
-            max_pages=settings.max_pages_per_keyword,
+            keyword=search.keyword,
+            max_pages=search.max_pages,
             youtube=youtube,
             quota=quota,
-            order=settings.search_order,
+            filters=params,
         )
-        data.discovery.extend(_stamp(results, extracted_at))
+        recorded_filters = {"q": search.keyword, **params}
+        data.discovery.extend(
+            {**row, "search_name": search.name, "search_filters": recorded_filters}
+            for row in _stamp(results, extracted_at)
+        )
 
     video_ids = list(dict.fromkeys(row["video_id"] for row in data.discovery))
     metrics.videos_discovered = len(video_ids)
@@ -111,8 +130,8 @@ def run_pipeline(settings: PipelineSettings, load: bool = True) -> PipelineResul
     result = PipelineResult(run_id=run_id, metrics=metrics)
 
     logger.info(
-        "Run %s: %s keywords, up to %s search calls, load=%s",
-        run_id, len(settings.keywords), settings.planned_search_calls, load,
+        "Run %s: %s searches, up to %s search calls, load=%s",
+        run_id, len(settings.searches), settings.planned_search_calls, load,
     )
 
     youtube = get_youtube_client()

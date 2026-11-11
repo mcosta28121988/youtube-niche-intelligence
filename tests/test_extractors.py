@@ -37,6 +37,25 @@ def test_search_ranks_across_pages_and_dedupes():
     assert quota.search_calls == 2  # stopped when no nextPageToken
 
 
+def test_search_passes_filters_but_keeps_core_parameters():
+    youtube = MagicMock()
+    youtube.search.return_value.list.return_value.execute.return_value = {"items": []}
+
+    search_videos(
+        "kw",
+        youtube=youtube,
+        filters={"order": "date", "regionCode": "AU", "videoDuration": "long",
+                 "type": "channel"},
+    )
+
+    kwargs = youtube.search.return_value.list.call_args.kwargs
+    assert kwargs["order"] == "date"  # filters may override order
+    assert kwargs["regionCode"] == "AU"
+    assert kwargs["videoDuration"] == "long"
+    assert kwargs["type"] == "video"  # core parameters cannot be overridden
+    assert kwargs["q"] == "kw"
+
+
 def test_video_hidden_counts_are_none_not_zero():
     youtube = MagicMock()
     item = {

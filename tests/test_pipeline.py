@@ -2,11 +2,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from config.settings import PipelineSettings
+from config.settings import PipelineSettings, SearchSpec
 from src.ingestion import pipeline
 from src.warehouse.pipeline_runs import RunStatus
 
-SETTINGS = PipelineSettings(keywords=("kw1", "kw2"))
+SETTINGS = PipelineSettings(searches=(
+    SearchSpec("kw1", region_code="AU", duration="long"),
+    SearchSpec("kw2", name="kw2 - education", category="Education"),
+))
 
 
 def discovery(video_id: str, channel_id: str, keyword: str) -> dict:
@@ -24,7 +27,11 @@ def mocks():
         patch.object(pipeline, "search_videos") as search,
         patch.object(pipeline, "get_video_statistics") as videos,
         patch.object(pipeline, "get_channel_statistics") as channels,
+        patch.object(pipeline, "CategoryResolver") as resolver_cls,
     ):
+        resolver_cls.return_value.resolve.side_effect = (
+            lambda category, region: "27" if category else None
+        )
         search.side_effect = lambda keyword, **kw: [
             discovery("v1", "c1", keyword),
             discovery("v2" if keyword == "kw1" else "v3", "c2", keyword),
@@ -55,6 +62,15 @@ def test_successful_run_loads_and_records_metrics(mocks):
     batches = mocks["load"].call_args.args[2]
     assert [len(rows) for _, rows in batches] == [4, 3, 2]
     assert all("extracted_at" in row for _, rows in batches for row in rows)
+
+    discovery_rows = batches[0][1]
+    assert {r["search_name"] for r in discovery_rows} == {"kw1", "kw2 - education"}
+    kw1_filters = next(r["search_filters"] for r in discovery_rows if r["search_name"] == "kw1")
+    assert kw1_filters["q"] == "kw1"
+    assert kw1_filters["regionCode"] == "AU"
+    assert kw1_filters["videoDuration"] == "long"
+    kw2_filters = next(r["search_filters"] for r in discovery_rows if r["search_name"] != "kw1")
+    assert kw2_filters["videoCategoryId"] == "27"
 
     mocks["purge"].assert_called_once()
     mocks["tracker"].start.assert_called_once()

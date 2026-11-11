@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 from googleapiclient.discovery import Resource
@@ -22,9 +23,12 @@ def search_videos(
     youtube: Resource | None = None,
     quota: QuotaTracker | None = None,
     order: str = "viewCount",
+    filters: Mapping[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Search videos for a keyword.
 
+    ``filters`` are extra search.list parameters (e.g. ``videoDuration``,
+    ``regionCode``, ``publishedAfter``) and may override ``order``.
     Returns one record per unique video with its 1-based ``search_rank``
     across pages. Each page costs one search.list call.
     """
@@ -40,12 +44,15 @@ def search_videos(
         logger.info("Searching keyword '%s', page %s", keyword, page + 1)
 
         request = youtube.search().list(
-            part="snippet",
-            q=keyword,
-            type="video",
-            maxResults=PAGE_SIZE,
-            order=order,
-            pageToken=next_page_token,
+            **{
+                "order": order,
+                **(filters or {}),
+                "part": "snippet",
+                "q": keyword,
+                "type": "video",  # required by the video-specific filters
+                "maxResults": PAGE_SIZE,
+                "pageToken": next_page_token,
+            }
         )
 
         response = execute_with_retry(request)

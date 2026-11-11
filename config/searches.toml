@@ -1,0 +1,57 @@
+# =============================================================================
+# YouTube search configuration
+#
+# [defaults] apply to every [[searches]] entry; any entry can override them.
+# Each page of each search uses 1 of the 100 daily search.list calls.
+# Validate without calling search:  python -m src.main --check-config
+# List categories for a region:      python -m src.main --list-categories --region AU
+# =============================================================================
+
+[defaults]
+max_pages = 1                 # pages of 50 results per search
+
+# Ranking: viewCount (popularity) | relevance | date | rating | title
+order = "viewCount"
+
+# Video length: any | short (< 4 min) | medium (4-20 min) | long (> 20 min)
+duration = "long"
+
+# Upload date: only videos published in the last N days (remove for all time)
+published_within_days = 7
+
+# Market. regionCode returns videos viewable in that country, ranked for its
+# viewers; it does NOT restrict results to creators from that country.
+region_code = "AU"
+relevance_language = "en"
+
+# Content safety: moderate | strict | none
+safe_search = "moderate"
+
+# Other optional filters (all default to "any"):
+# category   = "Education"      # name or ID - see --list-categories
+# definition = "high"           # any | high (HD) | standard
+# caption    = "closedCaption"  # any | closedCaption | none
+# license    = "creativeCommon" # any | creativeCommon | youtube
+# video_type = "movie"          # any | episode | movie
+# dimension  = "3d"             # any | 2d | 3d
+# event_type = "live"           # live | completed | upcoming
+
+# -----------------------------------------------------------------------------
+# Searches. 'name' must be unique; it defaults to the keyword.
+# -----------------------------------------------------------------------------
+
+[[searches]]
+keyword = "history documentary"
+
+[[searches]]
+keyword = "space documentary"
+
+[[searches]]
+keyword = "ancient civilizations"
+
+# Example: same keyword, different filters - give each a unique name.
+# [[searches]]
+# name = "space documentary - science category"
+# keyword = "space documentary"
+# category = "Science & Technology"
+# duration = "medium"
