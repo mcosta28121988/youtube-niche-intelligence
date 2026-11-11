@@ -10,6 +10,8 @@ from typing import Any
 
 from snowflake.connector import SnowflakeConnection
 
+from src.utils.redaction import redact
+
 logger = logging.getLogger(__name__)
 
 MAX_ERROR_LENGTH = 4000
@@ -65,7 +67,7 @@ class PipelineRunTracker:
         error_message: str | None = None,
     ) -> None:
         if error_message:
-            error_message = error_message[:MAX_ERROR_LENGTH]
+            error_message = redact(error_message)[:MAX_ERROR_LENGTH]
         with self.conn.cursor() as cursor:
             cursor.execute(
                 "UPDATE CONTROL.PIPELINE_RUNS SET "
