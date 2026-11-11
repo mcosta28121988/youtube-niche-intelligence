@@ -1,0 +1,72 @@
+-- =============================================================================
+-- Exploring RAW data (read-only)
+--
+-- Paste into a Snowsight worksheet (role YOUTUBE_INGEST_ROLE, warehouse
+-- YOUTUBE_INGEST_WH) or run all of it:
+--   python -m src.warehouse.run_sql sql/checks/explore_raw.sql
+--
+-- Policy reminder (docs/data_policy.md): query freely, but don't export or
+-- keep copies outside Snowflake, and don't build scores/rankings across
+-- channels from this data.
+-- =============================================================================
+
+USE WAREHOUSE YOUTUBE_INGEST_WH;
+
+-- 1. Runs, newest first
+SELECT RUN_ID, STATUS, STARTED_AT, FINISHED_AT,
+       VIDEOS_DISCOVERED, VIDEOS_ENRICHED, CHANNELS_EXTRACTED,
+       SEARCH_CALLS, API_QUOTA_UNITS_ESTIMATED, ERROR_MESSAGE
+FROM YOUTUBE_DB.CONTROL.PIPELINE_RUNS
+ORDER BY STARTED_AT DESC
+LIMIT 20;
+
+-- 2. What each configured search found in the latest successful run
+SELECT SEARCH_SOURCE, SEARCH_NAME, COUNT(*) AS VIDEOS,
+       ANY_VALUE(SEARCH_FILTERS) AS SEARCH_FILTERS
+FROM YOUTUBE_DB.RAW.VIDEO_DISCOVERY
+WHERE RUN_ID = (
+    SELECT RUN_ID FROM YOUTUBE_DB.CONTROL.PIPELINE_RUNS
+    WHERE STATUS = 'SUCCEEDED' ORDER BY STARTED_AT DESC LIMIT 1
+)
+GROUP BY SEARCH_SOURCE, SEARCH_NAME
+ORDER BY SEARCH_SOURCE, SEARCH_NAME;
+
+-- 3. Top 10 results per search in the latest run, with video statistics
+SELECT d.SEARCH_NAME, d.SEARCH_RANK, d.TITLE, d.CHANNEL_TITLE,
+       v.VIEW_COUNT, v.LIKE_COUNT, v.COMMENT_COUNT, v.DURATION, v.CATEGORY_ID,
+       d.PUBLISHED_AT
+FROM YOUTUBE_DB.RAW.VIDEO_DISCOVERY d
+JOIN YOUTUBE_DB.RAW.VIDEO_SNAPSHOT v USING (RUN_ID, VIDEO_ID)
+WHERE d.RUN_ID = (
+    SELECT RUN_ID FROM YOUTUBE_DB.CONTROL.PIPELINE_RUNS
+    WHERE STATUS = 'SUCCEEDED' ORDER BY STARTED_AT DESC LIMIT 1
+)
+  AND d.SEARCH_RANK <= 10
+ORDER BY d.SEARCH_NAME, d.SEARCH_RANK;
+
+-- 4. Latest snapshot of each channel
+SELECT CHANNEL_NAME, SUBSCRIBER_COUNT, TOTAL_VIEWS, VIDEO_COUNT, PUBLISHED_AT, SNAPSHOT_AT
+FROM YOUTUBE_DB.RAW.CHANNEL_SNAPSHOT
+QUALIFY ROW_NUMBER() OVER (PARTITION BY CHANNEL_ID ORDER BY SNAPSHOT_AT DESC) = 1
+ORDER BY SUBSCRIBER_COUNT DESC NULLS LAST
+LIMIT 50;
+
+-- 5. Fields not yet modelled as columns live in RAW_PAYLOAD
+SELECT VIDEO_ID,
+       RAW_PAYLOAD:snippet:tags                         AS TAGS,
+       RAW_PAYLOAD:snippet:defaultAudioLanguage::STRING AS AUDIO_LANGUAGE,
+       RAW_PAYLOAD:contentDetails:caption::STRING       AS HAS_CAPTIONS,
+       RAW_PAYLOAD:contentDetails:definition::STRING    AS DEFINITION
+FROM YOUTUBE_DB.RAW.VIDEO_SNAPSHOT
+LIMIT 20;
+
+-- 6. Data age: oldest rows are purged after the retention window (28 days)
+SELECT 'VIDEO_DISCOVERY' AS TABLE_NAME, COUNT(*) AS ROW_COUNT,
+       MIN(DISCOVERED_AT) AS OLDEST, MAX(DISCOVERED_AT) AS NEWEST
+FROM YOUTUBE_DB.RAW.VIDEO_DISCOVERY
+UNION ALL
+SELECT 'VIDEO_SNAPSHOT', COUNT(*), MIN(SNAPSHOT_AT), MAX(SNAPSHOT_AT)
+FROM YOUTUBE_DB.RAW.VIDEO_SNAPSHOT
+UNION ALL
+SELECT 'CHANNEL_SNAPSHOT', COUNT(*), MIN(SNAPSHOT_AT), MAX(SNAPSHOT_AT)
+FROM YOUTUBE_DB.RAW.CHANNEL_SNAPSHOT;

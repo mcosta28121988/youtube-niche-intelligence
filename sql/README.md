@@ -13,6 +13,7 @@ depends on is defined here, so the warehouse can be rebuilt from the repository.
 | `setup/03_resource_monitor.sql` | Optional monthly credit cap | Yes |
 | `migrations/` | One-off changes to an existing account, named `YYYYMMDD_NN_description.sql` | No - run once |
 | `checks/verify_setup.sql` | Read-only verification queries | Yes |
+| `checks/explore_raw.sql` | Read-only queries for exploring RAW data (see `docs/runbook.md`) | Yes |
 
 ## Running scripts
 
