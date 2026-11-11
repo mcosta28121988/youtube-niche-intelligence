@@ -1,32 +1,60 @@
 -- =============================================================================
--- Grant the ingestion role to the pipeline user and give it DML on RAW/CONTROL.
--- Run as ACCOUNTADMIN (or SECURITYADMIN + object owner). Idempotent.
---
--- Context: YOUTUBE_INGEST_ROLE already has warehouse USAGE/OPERATE, database and
--- schema USAGE, and CREATE TABLE / CREATE STAGE. It was missing:
---   1. assignment to the pipeline user
---   2. DML on the pre-existing tables (owned by ACCOUNTADMIN)
+-- 02_grant_ingest_role.sql
+-- Least-privilege grants for YOUTUBE_INGEST_ROLE. Idempotent.
+-- Run after 00 and 01. Requires SECURITYADMIN (holds MANAGE GRANTS).
 -- =============================================================================
 
-USE ROLE ACCOUNTADMIN;
+USE ROLE SECURITYADMIN;
 
--- 1. Role hierarchy: assign to the user and roll up to SYSADMIN (best practice,
---    so admins can manage objects the role creates).
-GRANT ROLE YOUTUBE_INGEST_ROLE TO USER costamurillonow;
+-- ---------------------------------------------------------------------------
+-- Role hierarchy
+-- ---------------------------------------------------------------------------
+-- Roll up to SYSADMIN so administrators inherit pipeline access.
 GRANT ROLE YOUTUBE_INGEST_ROLE TO ROLE SYSADMIN;
 
--- 2. DML on existing and future tables in RAW and CONTROL.
-GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA YOUTUBE_DB.RAW TO ROLE YOUTUBE_INGEST_ROLE;
-GRANT SELECT, INSERT ON FUTURE TABLES IN SCHEMA YOUTUBE_DB.RAW TO ROLE YOUTUBE_INGEST_ROLE;
+-- Pipeline user. CHANGE THIS to your Snowflake user object name.
+-- Double quotes matter: this user was created with a lower-case quoted name,
+-- and unquoted identifiers are upper-cased by Snowflake.
+-- (The connector authenticates with the user's LOGIN_NAME, which is separate.)
+GRANT ROLE YOUTUBE_INGEST_ROLE TO USER "costamurillonow";
 
--- CONTROL.PIPELINE_RUNS rows are inserted at start and updated at finish.
-GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA YOUTUBE_DB.CONTROL TO ROLE YOUTUBE_INGEST_ROLE;
+-- ---------------------------------------------------------------------------
+-- Compute
+-- ---------------------------------------------------------------------------
+GRANT USAGE, OPERATE ON WAREHOUSE YOUTUBE_INGEST_WH TO ROLE YOUTUBE_INGEST_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- Database and schemas
+-- ---------------------------------------------------------------------------
+GRANT USAGE ON DATABASE YOUTUBE_DB TO ROLE YOUTUBE_INGEST_ROLE;
+GRANT USAGE ON SCHEMA YOUTUBE_DB.RAW TO ROLE YOUTUBE_INGEST_ROLE;
+GRANT USAGE ON SCHEMA YOUTUBE_DB.CONTROL TO ROLE YOUTUBE_INGEST_ROLE;
+
+-- CREATE STAGE / CREATE TABLE are needed for the *temporary* stages and tables
+-- the loader uses for bulk loads. Snowflake has no temporary-only variant, so
+-- this privilege also allows permanent tables; by convention permanent tables
+-- are created only by SYSADMIN via 01_raw_tables.sql. Review once the loader
+-- is implemented and revoke anything it does not need.
+GRANT CREATE STAGE, CREATE TABLE ON SCHEMA YOUTUBE_DB.RAW TO ROLE YOUTUBE_INGEST_ROLE;
+GRANT CREATE TABLE ON SCHEMA YOUTUBE_DB.CONTROL TO ROLE YOUTUBE_INGEST_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- Table privileges (existing + future tables)
+-- ---------------------------------------------------------------------------
+-- RAW: append-only. DELETE is granted so a retried load can remove rows for
+-- its own RUN_ID before re-inserting (idempotent reload). No UPDATE.
+GRANT SELECT, INSERT, DELETE ON ALL TABLES    IN SCHEMA YOUTUBE_DB.RAW TO ROLE YOUTUBE_INGEST_ROLE;
+GRANT SELECT, INSERT, DELETE ON FUTURE TABLES IN SCHEMA YOUTUBE_DB.RAW TO ROLE YOUTUBE_INGEST_ROLE;
+
+-- CONTROL: run rows are inserted at start and updated at finish.
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES    IN SCHEMA YOUTUBE_DB.CONTROL TO ROLE YOUTUBE_INGEST_ROLE;
 GRANT SELECT, INSERT, UPDATE ON FUTURE TABLES IN SCHEMA YOUTUBE_DB.CONTROL TO ROLE YOUTUBE_INGEST_ROLE;
 
--- 3. Optional: make the pipeline role the user's default instead of ACCOUNTADMIN.
--- ALTER USER costamurillonow SET DEFAULT_ROLE = YOUTUBE_INGEST_ROLE
---                                DEFAULT_WAREHOUSE = YOUTUBE_INGEST_WH;
-
--- Verify
-SHOW GRANTS TO ROLE YOUTUBE_INGEST_ROLE;
-SHOW GRANTS OF ROLE YOUTUBE_INGEST_ROLE;
+-- ---------------------------------------------------------------------------
+-- User defaults (already applied on the live account; requires the user's
+-- owner, typically ACCOUNTADMIN). Uncomment for a fresh environment.
+-- ---------------------------------------------------------------------------
+-- USE ROLE ACCOUNTADMIN;
+-- ALTER USER "costamurillonow" SET
+--     DEFAULT_ROLE      = YOUTUBE_INGEST_ROLE
+--     DEFAULT_WAREHOUSE = YOUTUBE_INGEST_WH;
