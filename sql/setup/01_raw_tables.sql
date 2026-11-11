@@ -54,9 +54,12 @@ CREATE TABLE IF NOT EXISTS YOUTUBE_DB.RAW.VIDEO_DISCOVERY (
     PUBLISHED_AT    TIMESTAMP_TZ            COMMENT 'Video publish time',
     RAW_PAYLOAD     VARIANT                 COMMENT 'Untouched search result item',
     DISCOVERED_AT   TIMESTAMP_TZ   NOT NULL DEFAULT CURRENT_TIMESTAMP() COMMENT 'Extraction time (UTC)',
-    CONSTRAINT PK_VIDEO_DISCOVERY PRIMARY KEY (RUN_ID, SEARCH_KEYWORD, VIDEO_ID)
+    -- Added by migration 20261111_03 (kept last so fresh and migrated tables match)
+    SEARCH_NAME     VARCHAR(200)   NOT NULL COMMENT 'Unique name of the configured search (config/searches.toml)',
+    SEARCH_FILTERS  VARIANT                 COMMENT 'Exact search.list parameters sent (q, order, regionCode, ...)',
+    CONSTRAINT PK_VIDEO_DISCOVERY PRIMARY KEY (RUN_ID, SEARCH_NAME, VIDEO_ID)
 )
-COMMENT = 'Search results. Grain: one row per run x keyword x video.';
+COMMENT = 'Search results. Grain: one row per run x configured search x video.';
 
 -- ---------------------------------------------------------------------------
 -- RAW.VIDEO_SNAPSHOT - videos.list statistics at a point in time

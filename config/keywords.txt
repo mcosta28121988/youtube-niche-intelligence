@@ -1,6 +1,0 @@
-# Search keywords for video discovery - one per line.
-# Lines starting with # are ignored. Each keyword costs one search.list call
-# per page (default limit: 100 search calls per day).
-history documentary
-space documentary
-ancient civilizations

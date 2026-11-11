@@ -61,7 +61,7 @@ ACCOUNTADMIN
 
 | Table | Grain | Source endpoint |
 |---|---|---|
-| `RAW.VIDEO_DISCOVERY` | run × keyword × video | `search.list` |
+| `RAW.VIDEO_DISCOVERY` | run × configured search × video | `search.list` |
 | `RAW.VIDEO_SNAPSHOT` | run × video | `videos.list` |
 | `RAW.CHANNEL_SNAPSHOT` | run × channel | `channels.list` |
 | `CONTROL.PIPELINE_RUNS` | run | pipeline |
