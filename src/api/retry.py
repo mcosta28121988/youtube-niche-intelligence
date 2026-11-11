@@ -55,9 +55,7 @@ def is_retryable(error: HttpError) -> bool:
     if status in RETRYABLE_STATUS_CODES:
         return True
     # 403 is usually permanent (e.g. quotaExceeded), except rate limiting.
-    return status == 403 and any(
-        reason in RETRYABLE_REASONS for reason in error_reasons(error)
-    )
+    return status == 403 and any(reason in RETRYABLE_REASONS for reason in error_reasons(error))
 
 
 def backoff_seconds(attempt: int) -> float:
@@ -81,13 +79,14 @@ def execute_with_retry(
             if not is_retryable(error) or attempt == max_attempts:
                 if "quotaExceeded" in reasons:
                     logger.error(
-                        "YouTube API daily quota exhausted; it resets at "
-                        "midnight Pacific Time"
+                        "YouTube API daily quota exhausted; it resets at midnight Pacific Time"
                     )
                 logger.error(
-                    "YouTube API request failed: status=%s reasons=%s "
-                    "attempt=%s/%s",
-                    status, reasons, attempt, max_attempts,
+                    "YouTube API request failed: status=%s reasons=%s attempt=%s/%s",
+                    status,
+                    reasons,
+                    attempt,
+                    max_attempts,
                 )
                 raise
             cause = f"HTTP {status}"
@@ -96,16 +95,19 @@ def execute_with_retry(
             if attempt == max_attempts:
                 logger.error(
                     "YouTube API request failed after %s attempts: %s",
-                    max_attempts, type(error).__name__,
+                    max_attempts,
+                    type(error).__name__,
                 )
                 raise
             cause = type(error).__name__
 
         wait_seconds = backoff_seconds(attempt)
         logger.warning(
-            "Transient YouTube API error (%s). Attempt %s/%s. "
-            "Retrying in %.1f seconds.",
-            cause, attempt, max_attempts, wait_seconds,
+            "Transient YouTube API error (%s). Attempt %s/%s. Retrying in %.1f seconds.",
+            cause,
+            attempt,
+            max_attempts,
+            wait_seconds,
         )
         time.sleep(wait_seconds)
 

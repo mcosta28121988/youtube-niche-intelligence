@@ -30,8 +30,7 @@ def get_channel_statistics(
     unique_ids = list(dict.fromkeys(channel_ids))
 
     for i in range(0, len(unique_ids), BATCH_SIZE):
-
-        batch = unique_ids[i:i + BATCH_SIZE]
+        batch = unique_ids[i : i + BATCH_SIZE]
 
         request = youtube.channels().list(
             part="snippet,statistics,contentDetails",
@@ -43,7 +42,6 @@ def get_channel_statistics(
             quota.record("channels.list")
 
         for item in response.get("items", []):
-
             snippet = item["snippet"]
             stats = item.get("statistics", {})
             playlists = item.get("contentDetails", {}).get("relatedPlaylists", {})
@@ -54,16 +52,18 @@ def get_channel_statistics(
                 else optional_int(stats.get("subscriberCount"))
             )
 
-            results.append({
-                "channel_id": item["id"],
-                "channel_name": snippet["title"],
-                "published_at": snippet["publishedAt"],
-                "subscribers": subscribers,
-                "total_views": optional_int(stats.get("viewCount")),
-                "video_count": optional_int(stats.get("videoCount")),
-                "uploads_playlist_id": playlists.get("uploads"),
-                "raw_payload": item,
-            })
+            results.append(
+                {
+                    "channel_id": item["id"],
+                    "channel_name": snippet["title"],
+                    "published_at": snippet["publishedAt"],
+                    "subscribers": subscribers,
+                    "total_views": optional_int(stats.get("viewCount")),
+                    "video_count": optional_int(stats.get("videoCount")),
+                    "uploads_playlist_id": playlists.get("uploads"),
+                    "raw_payload": item,
+                }
+            )
 
     logger.info("Channel extraction completed: %s channels", len(results))
 

@@ -35,7 +35,9 @@ def test_search_ranks_across_pages_and_dedupes():
     videos = search_videos("kw", max_pages=3, youtube=youtube, quota=quota)
 
     assert [(v["video_id"], v["search_rank"]) for v in videos] == [
-        ("a", 1), ("b", 2), ("c", 4),
+        ("a", 1),
+        ("b", 2),
+        ("c", 4),
     ]
     assert videos[0]["raw_payload"] == search_item("a")
     assert videos[0]["keyword"] == "kw"
@@ -49,8 +51,7 @@ def test_search_passes_filters_but_keeps_core_parameters():
     search_videos(
         "kw",
         youtube=youtube,
-        filters={"order": "date", "regionCode": "AU", "videoDuration": "long",
-                 "type": "channel"},
+        filters={"order": "date", "regionCode": "AU", "videoDuration": "long", "type": "channel"},
     )
 
     kwargs = youtube.search.return_value.list.call_args.kwargs
@@ -94,17 +95,19 @@ def test_video_batches_of_fifty():
 def test_channel_hidden_subscriber_count_is_none():
     youtube = MagicMock()
     youtube.channels.return_value.list.return_value.execute.return_value = {
-        "items": [{
-            "id": "ch1",
-            "snippet": {"title": "C", "publishedAt": "2020-01-01T00:00:00Z"},
-            "statistics": {
-                "viewCount": "500",
-                "videoCount": "5",
-                "subscriberCount": "0",
-                "hiddenSubscriberCount": True,
-            },
-            "contentDetails": {"relatedPlaylists": {"uploads": "UU1"}},
-        }]
+        "items": [
+            {
+                "id": "ch1",
+                "snippet": {"title": "C", "publishedAt": "2020-01-01T00:00:00Z"},
+                "statistics": {
+                    "viewCount": "500",
+                    "videoCount": "5",
+                    "subscriberCount": "0",
+                    "hiddenSubscriberCount": True,
+                },
+                "contentDetails": {"relatedPlaylists": {"uploads": "UU1"}},
+            }
+        ]
     }
 
     [channel] = get_channel_statistics(["ch1"], youtube=youtube)
@@ -141,7 +144,9 @@ def test_trending_reads_chart_and_ranks_by_position():
     quota = QuotaTracker()
 
     videos = trending_videos(
-        max_pages=4, youtube=youtube, quota=quota,
+        max_pages=4,
+        youtube=youtube,
+        quota=quota,
         filters={"regionCode": "AU", "videoCategoryId": "24"},
     )
 
@@ -157,9 +162,7 @@ def test_trending_reads_chart_and_ranks_by_position():
 
 def test_trending_missing_chart_is_skipped_not_fatal():
     youtube = MagicMock()
-    content = json.dumps(
-        {"error": {"code": 404, "errors": [{"reason": "notFound"}]}}
-    ).encode()
+    content = json.dumps({"error": {"code": 404, "errors": [{"reason": "notFound"}]}}).encode()
     youtube.videos.return_value.list.return_value.execute.side_effect = HttpError(
         httplib2.Response({"status": 404}), content
     )

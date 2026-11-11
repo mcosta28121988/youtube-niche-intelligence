@@ -145,8 +145,11 @@ def run_pipeline(settings: PipelineSettings, load: bool = True) -> PipelineResul
 
     logger.info(
         "Run %s: %s searches, up to %s search calls + %s trending units, load=%s",
-        run_id, len(settings.searches), settings.planned_search_calls,
-        settings.planned_trending_units, load,
+        run_id,
+        len(settings.searches),
+        settings.planned_search_calls,
+        settings.planned_trending_units,
+        load,
     )
 
     youtube = get_youtube_client()
@@ -199,6 +202,10 @@ def _log_summary(result: PipelineResult) -> None:
     logger.info(
         "Run %s summary: videos discovered=%s, enriched=%s, channels=%s, "
         "search calls=%s, quota units=%s",
-        result.run_id, m.videos_discovered, m.videos_enriched,
-        m.channels_extracted, m.search_calls, m.quota_units,
+        result.run_id,
+        m.videos_discovered,
+        m.videos_enriched,
+        m.channels_extracted,
+        m.search_calls,
+        m.quota_units,
     )

@@ -49,14 +49,14 @@ def main() -> int:
     print("\nSnowflake connection successful!")
     print(f"User:      {user}")
     for label, value in actual.items():
-        status = "OK" if (value or "").upper() == expected[label].upper() else (
-            f"MISMATCH (expected {expected[label]})"
+        status = (
+            "OK"
+            if (value or "").upper() == expected[label].upper()
+            else (f"MISMATCH (expected {expected[label]})")
         )
         print(f"{label + ':':<10} {value}  [{status}]")
 
-    return 0 if all(
-        (actual[k] or "").upper() == expected[k].upper() for k in expected
-    ) else 1
+    return 0 if all((actual[k] or "").upper() == expected[k].upper() for k in expected) else 1
 
 
 if __name__ == "__main__":

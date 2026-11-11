@@ -42,9 +42,7 @@ MAX_ROWS_DISPLAYED = 50
 
 def iter_statements(sql_text: str) -> Iterator[str]:
     """Yield executable statements from a SQL script, without comments."""
-    for statement, _is_put_get in split_statements(
-        StringIO(sql_text), remove_comments=True
-    ):
+    for statement, _is_put_get in split_statements(StringIO(sql_text), remove_comments=True):
         statement = statement.strip()
         if statement and statement != ";":
             yield statement

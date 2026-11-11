@@ -43,8 +43,11 @@ def test_build_insert_sql_requires_rows():
 
 def test_row_values_orders_by_columns_and_encodes_json():
     row = {
-        "run_id": "r1", "video_id": "v1", "views": 5, "likes": None,
-        "raw_payload": {"title": "Café \"quoted\""},
+        "run_id": "r1",
+        "video_id": "v1",
+        "views": 5,
+        "likes": None,
+        "raw_payload": {"title": 'Café "quoted"'},
     }
 
     values = row_values(VIDEO_SNAPSHOT, row)
@@ -90,7 +93,9 @@ def test_load_run_with_no_rows_still_clears_run():
     load_run(conn, "run-1", [(VIDEO_SNAPSHOT, [])])
 
     assert executed_sql(cursor) == [
-        "BEGIN", "DELETE FROM RAW.VIDEO_SNAPSHOT WHERE RUN_ID = %s", "COMMIT",
+        "BEGIN",
+        "DELETE FROM RAW.VIDEO_SNAPSHOT WHERE RUN_ID = %s",
+        "COMMIT",
     ]
 
 

@@ -6,10 +6,12 @@ from config.settings import PipelineSettings, SearchSpec
 from src.ingestion import pipeline
 from src.warehouse.pipeline_runs import RunStatus
 
-SETTINGS = PipelineSettings(searches=(
-    SearchSpec("kw1", region_code="AU", duration="long"),
-    SearchSpec("kw2", name="kw2 - education", category="Education"),
-))
+SETTINGS = PipelineSettings(
+    searches=(
+        SearchSpec("kw1", region_code="AU", duration="long"),
+        SearchSpec("kw2", name="kw2 - education", category="Education"),
+    )
+)
 
 
 def discovery(video_id: str, channel_id: str, keyword: str) -> dict:
@@ -30,8 +32,8 @@ def mocks():
         patch.object(pipeline, "get_channel_statistics") as channels,
         patch.object(pipeline, "CategoryResolver") as resolver_cls,
     ):
-        resolver_cls.return_value.resolve.side_effect = (
-            lambda category, region: "27" if category else None
+        resolver_cls.return_value.resolve.side_effect = lambda category, region: (
+            "27" if category else None
         )
         search.side_effect = lambda keyword, **kw: [
             discovery("v1", "c1", keyword),
@@ -110,11 +112,13 @@ def test_no_load_mode_never_touches_snowflake(mocks):
 
 
 def test_category_only_search_and_trending_chart(mocks):
-    settings = PipelineSettings(searches=(
-        SearchSpec("kw1"),
-        SearchSpec(category="Education", region_code="AU"),
-        SearchSpec(source="trending", category="24", region_code="AU"),
-    ))
+    settings = PipelineSettings(
+        searches=(
+            SearchSpec("kw1"),
+            SearchSpec(category="Education", region_code="AU"),
+            SearchSpec(source="trending", category="24", region_code="AU"),
+        )
+    )
 
     pipeline.run_pipeline(settings)
 
@@ -122,7 +126,8 @@ def test_category_only_search_and_trending_chart(mocks):
     assert category_call["keyword"] is None
     assert category_call["filters"]["videoCategoryId"] == "27"
     assert mocks["trending"].call_args.kwargs["filters"] == {
-        "regionCode": "AU", "videoCategoryId": "24",
+        "regionCode": "AU",
+        "videoCategoryId": "24",
     }
 
     rows = mocks["load"].call_args.args[2][0][1]

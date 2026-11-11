@@ -110,9 +110,7 @@ class SearchSpec:
 
     def __post_init__(self) -> None:
         if self.source not in SOURCES:
-            raise ValueError(
-                f"source={self.source!r} is invalid; use one of {sorted(SOURCES)}"
-            )
+            raise ValueError(f"source={self.source!r} is invalid; use one of {sorted(SOURCES)}")
         if self.keyword is not None:
             keyword = str(self.keyword).strip()
             if not keyword:
@@ -130,7 +128,8 @@ class SearchSpec:
             raise ValueError(f"{label}: a search needs a keyword, a category, or both")
         if self.source == "trending":
             unsupported = [
-                f.name for f in fields(self)
+                f.name
+                for f in fields(self)
                 if f.name not in TRENDING_FIELDS and getattr(self, f.name) != f.default
             ]
             if unsupported:
@@ -150,8 +149,7 @@ class SearchSpec:
             value = getattr(self, field_name)
             if value is not None and value not in allowed:
                 raise ValueError(
-                    f"{label}: {field_name}={value!r} is invalid; "
-                    f"use one of {sorted(allowed)}"
+                    f"{label}: {field_name}={value!r} is invalid; use one of {sorted(allowed)}"
                 )
         if self.published_within_days is not None and self.published_within_days < 1:
             raise ValueError(f"{label}: published_within_days must be at least 1")
@@ -159,13 +157,10 @@ class SearchSpec:
             raise ValueError(
                 f"{label}: region_code must be a 2-letter upper-case ISO code, e.g. 'AU'"
             )
-        if (
-            self.relevance_language is not None
-            and not LANGUAGE_PATTERN.match(self.relevance_language)
+        if self.relevance_language is not None and not LANGUAGE_PATTERN.match(
+            self.relevance_language
         ):
-            raise ValueError(
-                f"{label}: relevance_language must be an ISO 639-1 code, e.g. 'en'"
-            )
+            raise ValueError(f"{label}: relevance_language must be an ISO 639-1 code, e.g. 'en'")
 
     def _default_name(self) -> str:
         if self.source == "search" and self.keyword:
@@ -232,8 +227,7 @@ class PipelineSettings:
             key = search.name.casefold()
             if key in seen:
                 raise ValueError(
-                    f"Duplicate search name '{search.name}'; give each search "
-                    "a unique 'name'"
+                    f"Duplicate search name '{search.name}'; give each search a unique 'name'"
                 )
             seen.add(key)
 
@@ -263,6 +257,7 @@ class PipelineSettings:
 
         Trending charts are capped at their maximum of TRENDING_MAX_PAGES.
         """
+
         def pages(search: SearchSpec) -> int:
             if search.source == "trending":
                 return min(max_pages, TRENDING_MAX_PAGES)

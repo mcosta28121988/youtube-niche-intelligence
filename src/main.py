@@ -29,23 +29,28 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="YouTube ingestion pipeline")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
-        "--no-load", action="store_true",
+        "--no-load",
+        action="store_true",
         help="Extract from the API without writing to Snowflake",
     )
     mode.add_argument(
-        "--purge-only", action="store_true",
+        "--purge-only",
+        action="store_true",
         help="Only delete RAW rows older than the retention window",
     )
     mode.add_argument(
-        "--check-config", action="store_true",
+        "--check-config",
+        action="store_true",
         help="Validate config/searches.toml and print the planned searches",
     )
     mode.add_argument(
-        "--list-categories", action="store_true",
+        "--list-categories",
+        action="store_true",
         help="List YouTube video categories for --region (1 quota unit)",
     )
     parser.add_argument(
-        "--max-pages", type=int,
+        "--max-pages",
+        type=int,
         help="Pages per search (overrides max_pages in searches.toml)",
     )
     parser.add_argument(
@@ -56,10 +61,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def print_plan(settings: PipelineSettings) -> None:
-    print(f"\n{len(settings.searches)} searches, "
-          f"up to {settings.planned_search_calls} search calls "
-          f"+ {settings.planned_trending_units} quota units for trending per run "
-          f"(retention: {settings.retention_days} days)\n")
+    print(
+        f"\n{len(settings.searches)} searches, "
+        f"up to {settings.planned_search_calls} search calls "
+        f"+ {settings.planned_trending_units} quota units for trending per run "
+        f"(retention: {settings.retention_days} days)\n"
+    )
     for search in settings.searches:
         placeholder = None if search.category_is_id else f"<{search.category}>"
         params = search.api_parameters(category_id=placeholder)
@@ -75,12 +82,13 @@ def print_plan(settings: PipelineSettings) -> None:
 
 def print_categories(region: str) -> None:
     categories = list_video_categories(get_youtube_client(), region)
-    print(f"\nYouTube video categories for {region} (searchable ones usable in "
-          "searches.toml as name or ID):\n")
+    print(
+        f"\nYouTube video categories for {region} (searchable ones usable in "
+        "searches.toml as name or ID):\n"
+    )
     print(f"  {'ID':>4}  {'Category':<28} Searchable")
     for category in sorted(categories, key=lambda c: int(c.id)):
-        print(f"  {category.id:>4}  {category.title:<28} "
-              f"{'yes' if category.assignable else 'no'}")
+        print(f"  {category.id:>4}  {category.title:<28} {'yes' if category.assignable else 'no'}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -93,9 +101,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.check_config:
             print_plan(settings)
         elif args.list_categories:
-            print_categories(
-                args.region or settings.searches[0].region_code or "US"
-            )
+            print_categories(args.region or settings.searches[0].region_code or "US")
         elif args.purge_only:
             run_retention(settings)
         else:

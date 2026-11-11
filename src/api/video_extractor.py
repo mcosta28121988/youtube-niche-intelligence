@@ -30,8 +30,7 @@ def get_video_statistics(
     unique_ids = list(dict.fromkeys(video_ids))
 
     for i in range(0, len(unique_ids), BATCH_SIZE):
-
-        batch = unique_ids[i:i + BATCH_SIZE]
+        batch = unique_ids[i : i + BATCH_SIZE]
 
         logger.info("Extracting statistics for %s videos", len(batch))
 
@@ -45,23 +44,24 @@ def get_video_statistics(
             quota.record("videos.list")
 
         for item in response.get("items", []):
-
             snippet = item["snippet"]
             stats = item.get("statistics", {})
             details = item.get("contentDetails", {})
 
-            results.append({
-                "video_id": item["id"],
-                "channel_id": snippet["channelId"],
-                "title": snippet["title"],
-                "category_id": snippet.get("categoryId"),
-                "published_at": snippet["publishedAt"],
-                "duration": details.get("duration"),
-                "views": optional_int(stats.get("viewCount")),
-                "likes": optional_int(stats.get("likeCount")),
-                "comments": optional_int(stats.get("commentCount")),
-                "raw_payload": item,
-            })
+            results.append(
+                {
+                    "video_id": item["id"],
+                    "channel_id": snippet["channelId"],
+                    "title": snippet["title"],
+                    "category_id": snippet.get("categoryId"),
+                    "published_at": snippet["publishedAt"],
+                    "duration": details.get("duration"),
+                    "views": optional_int(stats.get("viewCount")),
+                    "likes": optional_int(stats.get("likeCount")),
+                    "comments": optional_int(stats.get("commentCount")),
+                    "raw_payload": item,
+                }
+            )
 
     logger.info("Video enrichment completed: %s videos", len(results))
 

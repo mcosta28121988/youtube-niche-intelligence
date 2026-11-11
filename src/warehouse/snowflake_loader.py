@@ -128,11 +128,7 @@ def build_insert_sql(spec: TableSpec, row_count: int) -> str:
     row_placeholder = "(" + ", ".join(["%s"] * len(spec.columns)) + ")"
     values = ",\n".join([row_placeholder] * row_count)
 
-    return (
-        f"INSERT INTO {spec.name} ({column_names})\n"
-        f"SELECT {select_list}\n"
-        f"FROM VALUES\n{values}"
-    )
+    return f"INSERT INTO {spec.name} ({column_names})\nSELECT {select_list}\nFROM VALUES\n{values}"
 
 
 def row_values(spec: TableSpec, row: Mapping[str, Any]) -> tuple[Any, ...]:
@@ -148,7 +144,7 @@ def row_values(spec: TableSpec, row: Mapping[str, Any]) -> tuple[Any, ...]:
 
 def _chunks(rows: Sequence[Any], size: int) -> Iterator[Sequence[Any]]:
     for start in range(0, len(rows), size):
-        yield rows[start:start + size]
+        yield rows[start : start + size]
 
 
 def load_run(
@@ -166,9 +162,7 @@ def load_run(
             cursor.execute(f"DELETE FROM {spec.name} WHERE RUN_ID = %s", (run_id,))
             for chunk in _chunks(rows, chunk_size):
                 params = [
-                    value
-                    for row in chunk
-                    for value in row_values(spec, {**row, "run_id": run_id})
+                    value for row in chunk for value in row_values(spec, {**row, "run_id": run_id})
                 ]
                 cursor.execute(build_insert_sql(spec, len(chunk)), params)
             loaded[spec.name] = len(rows)

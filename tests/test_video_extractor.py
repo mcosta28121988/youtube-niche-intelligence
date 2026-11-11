@@ -16,16 +16,10 @@ def test_video_statistics(mock_client):
                     "channelId": "channel123",
                     "title": "Test video",
                     "categoryId": "22",
-                    "publishedAt": "2026-01-01T00:00:00Z"
+                    "publishedAt": "2026-01-01T00:00:00Z",
                 },
-                "statistics": {
-                    "viewCount": "1000",
-                    "likeCount": "100",
-                    "commentCount": "10"
-                },
-                "contentDetails": {
-                    "duration": "PT10M"
-                }
+                "statistics": {"viewCount": "1000", "likeCount": "100", "commentCount": "10"},
+                "contentDetails": {"duration": "PT10M"},
             }
         ]
     }

@@ -53,10 +53,7 @@ class SnowflakeConfig:
     def from_env(cls) -> SnowflakeConfig:
         missing = [name for name in REQUIRED_ENV_VARS if not os.getenv(name)]
         if missing:
-            raise ValueError(
-                "Missing Snowflake environment variables: "
-                + ", ".join(missing)
-            )
+            raise ValueError("Missing Snowflake environment variables: " + ", ".join(missing))
 
         key_path = Path(os.environ["SNOWFLAKE_PRIVATE_KEY_PATH"])
         if not key_path.is_absolute():
@@ -70,9 +67,7 @@ class SnowflakeConfig:
             database=os.environ["SNOWFLAKE_DATABASE"],
             schema=os.environ["SNOWFLAKE_SCHEMA"],
             private_key_path=key_path,
-            private_key_passphrase=(
-                os.getenv("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE") or None
-            ),
+            private_key_passphrase=(os.getenv("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE") or None),
         )
 
 
@@ -114,9 +109,7 @@ def get_snowflake_connection(
     return snowflake.connector.connect(
         account=config.account,
         user=config.user,
-        private_key=load_private_key_der(
-            config.private_key_path, config.private_key_passphrase
-        ),
+        private_key=load_private_key_der(config.private_key_path, config.private_key_passphrase),
         role=config.role,
         warehouse=config.warehouse,
         database=config.database,

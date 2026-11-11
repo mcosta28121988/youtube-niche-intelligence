@@ -10,11 +10,7 @@ from src.api.retry import backoff_seconds, execute_with_retry
 
 def http_error(status: int, reason: str | None = None) -> HttpError:
     response = httplib2.Response({"status": status})
-    content = (
-        json.dumps({"error": {"errors": [{"reason": reason}]}}).encode()
-        if reason
-        else b""
-    )
+    content = json.dumps({"error": {"errors": [{"reason": reason}]}}).encode() if reason else b""
     return HttpError(response, content)
 
 

@@ -25,6 +25,7 @@ def test_formatter_redacts_exception_tracebacks():
     except RuntimeError:
         record = logging.LogRecord("t", logging.ERROR, __file__, 1, "boom", None, True)
         import sys
+
         record.exc_info = sys.exc_info()
 
     output = RedactingFormatter("%(message)s").format(record)

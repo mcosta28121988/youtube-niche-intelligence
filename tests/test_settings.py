@@ -23,6 +23,7 @@ def write_config(tmp_path, text: str):
 
 # --- SearchSpec ---------------------------------------------------------------
 
+
 def test_name_defaults_to_keyword_and_is_stripped():
     spec = SearchSpec(keyword="  space documentary ")
 
@@ -83,6 +84,7 @@ def test_invalid_search_values_are_rejected(kwargs, message):
 
 # --- PipelineSettings ------------------------------------------------------------
 
+
 def test_duplicate_search_names_rejected():
     with pytest.raises(ValueError, match="Duplicate"):
         PipelineSettings(searches=(SearchSpec("kw"), SearchSpec("KW")))
@@ -128,8 +130,11 @@ def test_run_parameters_record_every_filter():
 
 # --- TOML loading ----------------------------------------------------------------
 
+
 def test_defaults_merge_into_searches_with_overrides(tmp_path):
-    path = write_config(tmp_path, """
+    path = write_config(
+        tmp_path,
+        """
         [defaults]
         region_code = "AU"
         duration = "long"
@@ -142,7 +147,8 @@ def test_defaults_merge_into_searches_with_overrides(tmp_path):
         keyword = "space documentary"
         duration = "medium"
         category = 28
-    """)
+    """,
+    )
 
     first, second = read_search_config(path)
 
@@ -193,7 +199,9 @@ def test_load_settings_uses_env_path_and_cli_override(tmp_path, monkeypatch):
 
 
 def test_load_settings_rejects_non_integer_env(tmp_path, monkeypatch):
-    monkeypatch.setenv("YOUTUBE_SEARCH_CONFIG", str(write_config(tmp_path, '[[searches]]\nkeyword = "a"')))
+    monkeypatch.setenv(
+        "YOUTUBE_SEARCH_CONFIG", str(write_config(tmp_path, '[[searches]]\nkeyword = "a"'))
+    )
     monkeypatch.setenv("YOUTUBE_RETENTION_DAYS", "two weeks")
 
     with pytest.raises(ValueError, match="YOUTUBE_RETENTION_DAYS"):
@@ -201,6 +209,7 @@ def test_load_settings_rejects_non_integer_env(tmp_path, monkeypatch):
 
 
 # --- Category-only searches and trending charts --------------------------------
+
 
 def test_category_only_search_is_valid_and_sends_no_keyword():
     spec = SearchSpec(category="27", region_code="AU")
@@ -245,10 +254,12 @@ def test_invalid_trending_values_are_rejected(kwargs, message):
 
 
 def test_trending_pages_do_not_count_against_search_budget():
-    settings = PipelineSettings(searches=(
-        SearchSpec("kw", max_pages=2),
-        SearchSpec(source="trending", max_pages=4),
-    ))
+    settings = PipelineSettings(
+        searches=(
+            SearchSpec("kw", max_pages=2),
+            SearchSpec(source="trending", max_pages=4),
+        )
+    )
 
     assert settings.planned_search_calls == 2
     assert settings.planned_trending_units == 4
@@ -257,7 +268,9 @@ def test_trending_pages_do_not_count_against_search_budget():
 
 
 def test_trending_entries_ignore_search_only_defaults(tmp_path):
-    path = write_config(tmp_path, """
+    path = write_config(
+        tmp_path,
+        """
         [defaults]
         region_code = "AU"
         duration = "long"
@@ -269,7 +282,8 @@ def test_trending_entries_ignore_search_only_defaults(tmp_path):
         [[searches]]
         source = "trending"
         category = 24
-    """)
+    """,
+    )
 
     category_search, trending = read_search_config(path)
 

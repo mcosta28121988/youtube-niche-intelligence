@@ -26,7 +26,4 @@ class QuotaTracker:
     @property
     def units(self) -> int:
         """Units consumed from the shared daily budget (excludes search.list)."""
-        return sum(
-            count for endpoint, count in self.calls.items()
-            if endpoint != SEARCH_ENDPOINT
-        )
+        return sum(count for endpoint, count in self.calls.items() if endpoint != SEARCH_ENDPOINT)

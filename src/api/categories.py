@@ -78,9 +78,7 @@ class CategoryResolver:
             return category
         region = region_code or DEFAULT_REGION
         if region not in self._cache:
-            self._cache[region] = list_video_categories(
-                self.youtube, region, quota=self.quota
-            )
+            self._cache[region] = list_video_categories(self.youtube, region, quota=self.quota)
         category_id = find_category_id(category, self._cache[region])
         logger.info("Category '%s' resolved to ID %s (%s)", category, category_id, region)
         return category_id

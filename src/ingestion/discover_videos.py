@@ -148,7 +148,8 @@ def trending_videos(
             if CHART_NOT_FOUND_REASONS.intersection(error_reasons(error)):
                 logger.warning(
                     "No Most Popular chart for %s; this category may not "
-                    "have a chart in this region. Skipping.", label,
+                    "have a chart in this region. Skipping.",
+                    label,
                 )
                 return videos
             raise
