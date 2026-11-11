@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, secrets guard and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # No secrets are configured: tests mock the YouTube API and Snowflake.
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Guard against committed credentials
+        run: |
+          set -euo pipefail
+          tracked=$(git ls-files | grep -E '(^|/)\.env$|\.p8$|\.pem$|\.key$|(^|/)profiles\.yml$' || true)
+          if [ -n "$tracked" ]; then
+            echo "::error::Credential files are tracked by git:"; echo "$tracked"; exit 1
+          fi
+          if git grep -nIE 'AIza[0-9A-Za-z_-]{35}|-----BEGIN [A-Z ]*PRIVATE KEY-----' -- ':!.github/workflows/ci.yml'; then
+            echo "::error::Possible API key or private key found in tracked files"; exit 1
+          fi
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff lint
+        run: ruff check --output-format=github .
+
+      - name: Ruff format
+        run: ruff format --check .
+
+      - name: Validate search config
+        run: python -m src.main --check-config
+
+      - name: Tests
+        run: pytest
