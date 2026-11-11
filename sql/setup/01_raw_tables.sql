@@ -30,9 +30,11 @@ CREATE TABLE IF NOT EXISTS YOUTUBE_DB.CONTROL.PIPELINE_RUNS (
     VIDEOS_DISCOVERED          NUMBER(38,0)            COMMENT 'Unique video IDs returned by search.list',
     VIDEOS_ENRICHED            NUMBER(38,0)            COMMENT 'Videos returned by videos.list',
     CHANNELS_EXTRACTED         NUMBER(38,0)            COMMENT 'Channels returned by channels.list',
-    API_QUOTA_UNITS_ESTIMATED  NUMBER(38,0)            COMMENT 'Estimated YouTube API quota units consumed',
+    API_QUOTA_UNITS_ESTIMATED  NUMBER(38,0)            COMMENT 'Estimated units used from the 10,000/day budget (excludes search.list)',
     ERROR_MESSAGE              VARCHAR                 COMMENT 'Failure reason when STATUS = FAILED',
     CREATED_AT                 TIMESTAMP_TZ   DEFAULT CURRENT_TIMESTAMP() COMMENT 'Row insert time',
+    -- Added by migration 20261111_02 (kept last so fresh and migrated tables match)
+    SEARCH_CALLS               NUMBER(38,0)            COMMENT 'search.list calls made (separate 100/day allowance)',
     CONSTRAINT PK_PIPELINE_RUNS PRIMARY KEY (RUN_ID)
 )
 COMMENT = 'Pipeline execution log. Grain: one row per run.';

@@ -30,13 +30,8 @@ GRANT USAGE ON DATABASE YOUTUBE_DB TO ROLE YOUTUBE_INGEST_ROLE;
 GRANT USAGE ON SCHEMA YOUTUBE_DB.RAW TO ROLE YOUTUBE_INGEST_ROLE;
 GRANT USAGE ON SCHEMA YOUTUBE_DB.CONTROL TO ROLE YOUTUBE_INGEST_ROLE;
 
--- CREATE STAGE / CREATE TABLE are needed for the *temporary* stages and tables
--- the loader uses for bulk loads. Snowflake has no temporary-only variant, so
--- this privilege also allows permanent tables; by convention permanent tables
--- are created only by SYSADMIN via 01_raw_tables.sql. Review once the loader
--- is implemented and revoke anything it does not need.
-GRANT CREATE STAGE, CREATE TABLE ON SCHEMA YOUTUBE_DB.RAW TO ROLE YOUTUBE_INGEST_ROLE;
-GRANT CREATE TABLE ON SCHEMA YOUTUBE_DB.CONTROL TO ROLE YOUTUBE_INGEST_ROLE;
+-- No CREATE privileges: the loader inserts with INSERT ... SELECT FROM VALUES
+-- and needs no stages or temporary tables. All tables are created by SYSADMIN.
 
 -- ---------------------------------------------------------------------------
 -- Table privileges (existing + future tables)

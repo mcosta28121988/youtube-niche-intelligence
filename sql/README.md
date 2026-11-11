@@ -52,10 +52,8 @@ ACCOUNTADMIN
 ```
 
 - The pipeline never runs as `ACCOUNTADMIN`.
-- Permanent tables are created by `SYSADMIN`. The pipeline role holds
-  `CREATE STAGE`/`CREATE TABLE` for temporary bulk-load objects; Snowflake
-  cannot restrict this to temporary objects, so it is a convention, to be
-  tightened once the loader's needs are final.
+- All tables are created by `SYSADMIN`. The pipeline role has no `CREATE`
+  privileges: it can only read and write rows in existing tables.
 - Future grants mean newly created tables are automatically accessible to the
   pipeline role.
 
