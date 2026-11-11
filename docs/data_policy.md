@@ -63,6 +63,18 @@ relying on it.
 
 ## 4. Compliance design
 
+**Decision (2026-11-11): Option A.** Operate within the default policies.
+Applying for the derived-metrics program is deferred, not rejected; retention
+is configurable so the design can adopt it if approved.
+
+The 30-day limit applies to **every copy** of YouTube data, not only `RAW`:
+dbt tables and snapshots, Power BI import-mode datasets (`.pbix` caches),
+CSV exports and local files. In particular, **dbt snapshots (SCD Type 2) are
+not used for YouTube data**: they exist to keep history indefinitely, which
+R1/R2 forbid. RAW is already append-only per run, which gives up to 30 days of
+daily history for trend views. dbt snapshots are used for the niche
+intelligence domain, such as tracking changes to scoring assumptions over time.
+
 The platform is split into two clearly separated data domains:
 
 | Domain | Source | Retention | Allowed processing |
@@ -76,7 +88,8 @@ Controls:
    (configurable via `YOUTUBE_RETENTION_DAYS`, hard maximum 30 unless an
    approved derived-metrics use case raises it for statistics only).
    dbt models over YouTube data are views or full rebuilds, so nothing derived
-   outlives the RAW rows.
+   outlives the RAW rows. Power BI datasets over YouTube data refresh at
+   least daily so their cached copies also stay within the window.
 2. **No scores from API data.** The scoring engine reads only from the niche
    intelligence domain. dbt enforces this by keeping the two domains in
    separate model folders and sources.
